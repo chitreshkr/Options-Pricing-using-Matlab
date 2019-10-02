@@ -1,0 +1,104 @@
+%%%%%%%%%% Option parameters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+S = 50; % Value of the underlying
+K = 50; % Strike (exercise price)
+r = 0.05; % Risk free interest rate
+sigma = 0.2; % Volatility
+T = 3; % Time to expiry
+%%%%%%%%%% Method Paramaters %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+M = 80; % Number of asset mesh points
+N = 200; % Number of time mesh points
+Szero = 0; % Specify extremes
+Smax= 150;
+%%%%%%%%%% Setup Mesh and BCs %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+solution_mesh=zeros(N+1,M+1); % Create Mesh
+Smesh=0:(Smax/M):Smax; % Mesh of equally spaced S values
+Tmesh=T:-(T/N):0; % Mesh of equally spaced T values
+dt=T/N; % Specify timestep, dt
+solution_mesh(1,:)= max(K-Smesh,0); % Payoff BC (Put)
+solution_mesh(:,1)= K*exp(-r*(T-Tmesh)); % BC at S=0
+solution_mesh(:,M+1)= 0; % BC at S=M
+A = @(i) 0.5*dt*(r*i-sigma^2*i^2);
+B = @(i) 1 + (sigma^2*i^2 + r)*dt; % Define the functions A, B & C
+C = @(i) -0.5*dt*(sigma^2*i^2+r*i);
+%%%%%%%%%% Construct Tridiagonal Matrix, Tri %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Acoeffs = zeros(M+1,1);Bcoeffs = zeros(M+1,1);Ccoeffs = zeros(M+1,1);
+for i=1:M+1
+Acoeffs(i) = A(i-1); Bcoeffs(i) = B(i-1); Ccoeffs(i) = C(i-1);
+end
+Tri=diag(Acoeffs(2:end),-1)+diag(Bcoeffs)+diag(Ccoeffs(1:end-1),+1);
+Tri_Inv=inv(Tri); % Compute inverse
+%%%%%%%%%% Implicit Euler Iteration %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for j=1:N
+temp=zeros(M+1,1);
+temp(1)=A(0)*solution_mesh(j+1,1);
+temp(end)=C(M)*solution_mesh(j+1,M+1); % Boundary terms
+RHS=solution_mesh(j,:)'-temp;
+temp=Tri_Inv*RHS;
+solution_mesh(j+1,(2:end-1))=temp(2:end-1);
+end
+
+%Save file to CSV
+%filename = 'FuzzySets.csv'; 
+%dlmwrite(filename, solution_mesh,'-append', 'delimiter', ',');
+
+%filename = 'CrispInputs.csv'; 
+%dlmwrite(filename, Smesh,'-append', 'delimiter', ',');
+
+%filename = 'FuzzyRules.csv'; 
+%dlmwrite(filename, Tmesh,'-append', 'delimiter', ',');
+
+%Apply fuzzyLogic
+%FuzzySet = FLP_LoadFuzzySets('FuzzySets.csv');
+%CrispInput = FLP_LoadCrispInput(FuzzySet,'CrispInputs.csv');
+%FuzzyRules = FLP_LoadFuzzyRules(FuzzySet,'FuzzyRules.csv');
+
+%AntMemberGrades = FLP_Fuzzification(FuzzySet, CrispInput);
+%ConsqMemberGrades = FLP_FuzzyRuleEval(AntMemberGrades,FuzzyRules);
+%[CrispOutput, OutputMF, X] = FLP_DeFuzzification(ConsqMemberGrades, FuzzySet, 100);
+%plotdata = FLP_3DMFplot( FuzzySet, FuzzyRules, 1, 2, 20 );
+
+%Cluster Data Using Fuzzy C-Means Clustering
+load('FuzzySets.csv');
+
+%No of Clusters
+n_clusters = 5;
+
+%Find 5 clusters using fuzzy c-means clustering.
+[centers,U,obj_fcn] = fcm(FuzzySets,n_clusters);
+
+%Classify each data point into the cluster with the largest membership
+%value.
+maxU = max(U);
+index1 = find(U(1,:) == maxU);
+index2 = find(U(2,:) == maxU);
+index3 = find(U(3,:) == maxU);
+index4 = find(U(4,:) == maxU);
+index5 = find(U(5,:) == maxU);
+
+
+
+
+%Plot the clustered data and cluster centers.
+plot(FuzzySets(index1,1),FuzzySets(index1,5),'ob')
+hold on
+plot(FuzzySets(index2,1),FuzzySets(index2,5),'or')
+hold on
+plot(FuzzySets(index3,1),FuzzySets(index3,5),'og')
+hold on
+plot(FuzzySets(index4,1),FuzzySets(index4,5),'oy')
+hold on
+plot(FuzzySets(index5,1),FuzzySets(index5,5),'ob')
+hold on
+plot(centers(1,1),centers(1,5),'xb','MarkerSize',15,'LineWidth',3)
+plot(centers(2,1),centers(2,5),'xr','MarkerSize',15,'LineWidth',3)
+plot(centers(3,1),centers(3,5),'xg','MarkerSize',15,'LineWidth',3)
+plot(centers(4,1),centers(4,5),'xy','MarkerSize',15,'LineWidth',3)
+plot(centers(5,1),centers(5,5),'xb','MarkerSize',15,'LineWidth',3)
+hold off
+fcmdemo
+mesh(Smesh,Tmesh,solution_mesh)
+
+xlabel('S');ylabel('t');
+zlabel('V(S,t)')
+%%%%%%%%% Extract Desired Values Using Interpolation %%%%%%%%%%%%%%%%%%%%%%
+interp1(Smesh,solution_mesh(N+1,:),S)

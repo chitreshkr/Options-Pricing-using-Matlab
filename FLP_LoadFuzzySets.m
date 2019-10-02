@@ -1,0 +1,84 @@
+function [ output ] = FLP_LoadFuzzySets( file_dir )
+% FLP_LoadFuzzySets Reads Fuzzy Sets from comma delimited text file
+
+%   This function reads in a CSV delimited text file containing the details
+%   of the fuzzy set and formats the detail in the form of a structure
+%   array
+%
+% Input
+% file_dir - the path and filename of the CSV file
+%
+% Output
+% output -  a FuzzySet object
+%
+% Author: Jim Kunce (jdk_acct@yahoo.com)
+
+% read the CSV file
+fid = fopen(file_dir);             
+fid_read = textscan(fid,'%d','delimiter','\n');
+fclose(fid);
+
+% ***** Section to create a unique list of the sets *****
+
+input_ct = size(fid_read{1,1},1); % get the number of input records to check
+sets{1,1} = fid_read{1,1}{1,1}; % add the first set label to the variable to hold the unique list of sets
+
+
+
+for i = 2:input_ct % loop thru the remaining records
+    find_set = fid_read{1,1}{i,1}; % read the next set label
+    find_set_row = find(strcmp(find_set,sets)); % try to find the set label in the unique list 
+    if size(find_set_row,1) == 0 % if the result of the find is blank, add it to the unique list
+        sets{size(sets,1)+1,1} = find_set; % add the label to the unique list
+    end    
+end
+
+% Confirm the Output set was listed last in the text file
+if ~strcmp(sets{end,1},'Output')
+    fprintf('ERROR LOADING FUZZY SETS: The input file must end with the "Output" set items\n\n');
+    output = [];
+    return
+end
+
+% ***** Section to create a list of each item & parameters in each set *****
+
+input_ct = size(sets,1); % get the number of sets to check
+% pre-allocate collection statistics
+items = cell(input_ct,1);
+item_count = zeros(input_ct,1);
+parms = cell(input_ct,1);
+range = zeros(input_ct,2);
+
+for i = 1:input_ct % loop thru the each set
+    find_items = sets{i,1}; % read the set label
+    find_item_rows = find(strcmp(find_items,fid_read{1,1})); % find the rows with items from the set 
+    if size(find_item_rows,1) > 0 % if there are items in the set, create a list of items
+        items{i,1} = {fid_read{1,2}{find_item_rows,1}}'; % add the items to the list
+        item_count(i,1) = size(items{i,1},1);
+        a = double(fid_read{1,3}(find_item_rows,1)); % get the a parameters
+        b = double(fid_read{1,4}(find_item_rows,1)); % get the b parameters
+        c = double(fid_read{1,5}(find_item_rows,1)); % get the c parameters
+        d = double(fid_read{1,6}(find_item_rows,1)); % get the d parameters
+        p_combined = [a,b,c,d];
+        parms{i,1} = p_combined;
+        range(i,1) = min(parms{i,1}(:,1)); % get the minimum of the range for the set
+        range(i,2) = max(parms{i,1}(:,4)); % get the maximum of the range for the set
+    end    
+end
+
+% store the output in a structure array
+output = struct('Count',size(sets,1), ...
+                'Set',{sets}, ...
+                'Items',{items}, ...
+                'ItemCount', {item_count}, ...
+                'Parms',{parms}, ...
+                'Range',{range});
+                
+
+end
+
+
+
+
+
+
